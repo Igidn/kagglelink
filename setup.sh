@@ -97,15 +97,17 @@ INSTALL_DIR="/tmp/kagglelink"
 # Takes optional exit code parameter (default: 1 for errors, 0 for help)
 usage() {
     local exit_code="${1:-1}"
-    echo "Usage: curl -sS https://raw.githubusercontent.com/bhdai/kagglelink/refs/heads/${KAGGLELINK_BRANCH}/setup.sh | bash -s -- -k <your_public_key_url> -t <your_zrok_token>"
+    echo "Usage: curl -sS https://raw.githubusercontent.com/bhdai/kagglelink/refs/heads/${KAGGLELINK_BRANCH}/setup.sh | bash -s -- [-k <your_public_key_url>] [-p <your_ssh_password>] -t <your_zrok_token>"
     echo ""
     echo "Options:"
     echo "  -k, --keys-url URL    URL to your authorized_keys file"
+    echo "  -p, --password PASS   SSH password for the root user"
     echo "  -t, --token TOKEN     Your zrok token"
     echo "  -h, --help            Display this help message"
     echo ""
     echo "Environment Variables (fallback when CLI flags not provided):"
     echo "  KAGGLELINK_KEYS_URL   URL to your authorized_keys file"
+    echo "  KAGGLELINK_PASSWORD   SSH password for the root user"
     echo "  KAGGLELINK_TOKEN      Your zrok token"
     echo "  BRANCH                Override default branch (current: ${KAGGLELINK_BRANCH})"
     exit "$exit_code"
@@ -114,6 +116,7 @@ usage() {
 # Parse command line arguments
 # Initialize source tracking variables
 AUTH_KEYS_SOURCE=""
+SSH_PASSWORD_SOURCE=""
 ZROK_TOKEN_SOURCE=""
 
 while [[ $# -gt 0 ]]; do
@@ -126,6 +129,11 @@ while [[ $# -gt 0 ]]; do
         -t | --token)
             ZROK_TOKEN="$2"
             ZROK_TOKEN_SOURCE="CLI argument"
+            shift 2
+            ;;
+        -p | --password)
+            SSH_PASSWORD="$2"
+            SSH_PASSWORD_SOURCE="CLI argument"
             shift 2
             ;;
         -h | --help)
@@ -144,6 +152,11 @@ if [ -z "$AUTH_KEYS_URL" ] && [ -n "$KAGGLELINK_KEYS_URL" ]; then
     AUTH_KEYS_SOURCE="KAGGLELINK_KEYS_URL env var"
 fi
 
+if [ -z "$SSH_PASSWORD" ] && [ -n "$KAGGLELINK_PASSWORD" ]; then
+    SSH_PASSWORD="$KAGGLELINK_PASSWORD"
+    SSH_PASSWORD_SOURCE="KAGGLELINK_PASSWORD env var"
+fi
+
 if [ -z "$ZROK_TOKEN" ] && [ -n "$KAGGLELINK_TOKEN" ]; then
     ZROK_TOKEN="$KAGGLELINK_TOKEN"
     ZROK_TOKEN_SOURCE="KAGGLELINK_TOKEN env var"
@@ -153,15 +166,19 @@ fi
 if [ -n "$AUTH_KEYS_URL" ]; then
     echo "ℹ️  Using keys URL from: $AUTH_KEYS_SOURCE"
 fi
+if [ -n "$SSH_PASSWORD" ]; then
+    echo "ℹ️  Using SSH password from: $SSH_PASSWORD_SOURCE"
+fi
 if [ -n "$ZROK_TOKEN" ]; then
     echo "ℹ️  Using token from: $ZROK_TOKEN_SOURCE"
 fi
 
 # Check for required parameters
-if [ -z "$AUTH_KEYS_URL" ]; then
-    echo "Error: Public key URL is required"
-    echo "       Provide via: -k <url> or --keys-url <url>"
-    echo "       Or set: KAGGLELINK_KEYS_URL environment variable"
+if [ -z "$AUTH_KEYS_URL" ] && [ -z "$SSH_PASSWORD" ]; then
+    echo "Error: SSH authentication is required"
+    echo "       Provide either: -k <url> / --keys-url <url>"
+    echo "       Or: -p <password> / --password <password>"
+    echo "       Or set: KAGGLELINK_KEYS_URL or KAGGLELINK_PASSWORD"
     echo "       Run with --help for more information"
     exit 1
 fi
@@ -175,7 +192,7 @@ if [ -z "$ZROK_TOKEN" ]; then
 fi
 
 # Validate that AUTH_KEYS_URL uses HTTPS (security requirement)
-if [[ ! "$AUTH_KEYS_URL" =~ ^https:// ]]; then
+if [ -n "$AUTH_KEYS_URL" ] && [[ ! "$AUTH_KEYS_URL" =~ ^https:// ]]; then
     categorize_error "prerequisite" "Keys URL must use HTTPS (not HTTP): $AUTH_KEYS_URL" "Use HTTPS URL instead"
     if [[ "$AUTH_KEYS_URL" =~ ^http:// ]]; then
         echo "   Suggested: ${AUTH_KEYS_URL/http:/https:}" >&2
@@ -230,9 +247,16 @@ log_step_complete "Cloning repository"
 log_info "Making scripts executable..."
 chmod +x setup_kaggle_zrok.sh start_zrok.sh
 
-log_step_start "Setting up SSH with your public keys"
-./setup_kaggle_zrok.sh "$AUTH_KEYS_URL"
-log_step_complete "Setting up SSH with your public keys"
+log_step_start "Setting up SSH access"
+setup_args=()
+if [ -n "$AUTH_KEYS_URL" ]; then
+    setup_args+=(--keys-url "$AUTH_KEYS_URL")
+fi
+if [ -n "$SSH_PASSWORD" ]; then
+    setup_args+=(--password "$SSH_PASSWORD")
+fi
+./setup_kaggle_zrok.sh "${setup_args[@]}"
+log_step_complete "Setting up SSH access"
 
 log_info "Starting zrok service with your token..."
 # Note: start_zrok.sh is a blocking process that will display success banner

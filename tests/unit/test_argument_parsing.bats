@@ -19,6 +19,7 @@ teardown() {
     cleanup_test_dir
     restore_mocks
     unset KAGGLELINK_KEYS_URL
+    unset KAGGLELINK_PASSWORD
     unset KAGGLELINK_TOKEN
 }
 
@@ -27,14 +28,23 @@ teardown() {
 # =============================================================================
 
 @test "P0: should show usage when no arguments provided" {
-    run env -u KAGGLELINK_KEYS_URL -u KAGGLELINK_TOKEN bash setup.sh
+    run env -u KAGGLELINK_KEYS_URL -u KAGGLELINK_PASSWORD -u KAGGLELINK_TOKEN bash setup.sh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Usage"* ]] || [[ "$output" == *"-k"* ]] || [[ "$output" == *"--keys-url"* ]]
+    [[ "$output" == *"Usage"* ]] || [[ "$output" == *"-k"* ]] || [[ "$output" == *"--keys-url"* ]] || [[ "$output" == *"--password"* ]]
 }
 
 @test "P0: should fail when --keys-url is missing" {
     run bash setup.sh -t "test-token"
     [ "$status" -ne 0 ]
+}
+
+@test "P0: should accept password auth without keys URL" {
+    mock_git
+    mock_curl
+
+    run timeout 5 bash setup.sh -p "test-password" -t "test-token" 2>&1 || true
+
+    [[ "$output" != *"Unknown option"* ]]
 }
 
 @test "P0: should fail when --token is missing" {
@@ -65,6 +75,15 @@ teardown() {
     
     run timeout 5 bash setup.sh --keys-url "https://example.com/keys" --token "test-token" 2>&1 || true
     
+    [[ "$output" != *"Unknown option"* ]]
+}
+
+@test "P0: should accept long password flag (--password)" {
+    mock_git
+    mock_curl
+
+    run timeout 5 bash setup.sh --password "test-password" --token "test-token" 2>&1 || true
+
     [[ "$output" != *"Unknown option"* ]]
 }
 

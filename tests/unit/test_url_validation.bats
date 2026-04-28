@@ -43,6 +43,7 @@ teardown() {
         rm -rf "$TEST_TEMP_DIR"
     fi
     unset KAGGLELINK_KEYS_URL
+    unset KAGGLELINK_PASSWORD
     unset KAGGLELINK_TOKEN
 }
 
@@ -67,8 +68,13 @@ teardown() {
 }
 
 @test "P0: should reject empty URLs" {
-    run env -u KAGGLELINK_KEYS_URL bash "${PROJECT_ROOT}/setup.sh" -k "" -t "test-token"
+    run env -u KAGGLELINK_KEYS_URL -u KAGGLELINK_PASSWORD bash "${PROJECT_ROOT}/setup.sh" -k "" -t "test-token"
     [ "$status" -ne 0 ]
+}
+
+@test "P0: should not validate missing keys URL when password auth is used" {
+    run env -u KAGGLELINK_KEYS_URL bash "${PROJECT_ROOT}/setup.sh" -p "test-password" -t "test-token"
+    [ "$status" -eq 0 ]
 }
 
 @test "P0: URL validation should run before git clone" {

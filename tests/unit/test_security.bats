@@ -47,6 +47,11 @@ teardown() {
     [ "$status" -ne 0 ]  # Should NOT find token being echoed
 }
 
+@test "P0: setup.sh does not echo raw password value" {
+    run grep -E 'echo\s+["\$]*(password|PASSWORD|SSH_PASSWORD)' "${PROJECT_ROOT}/setup.sh"
+    [ "$status" -ne 0 ]
+}
+
 @test "P0: start_zrok.sh does not log token to file" {
     # Check for logging token to files
     run grep -E '(>|>>).*\$(token|TOKEN|ZROK)' "${PROJECT_ROOT}/start_zrok.sh"

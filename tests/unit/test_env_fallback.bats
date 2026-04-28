@@ -38,6 +38,7 @@ teardown() {
         rm -rf "$TEST_TEMP_DIR"
     fi
     unset KAGGLELINK_KEYS_URL
+    unset KAGGLELINK_PASSWORD
     unset KAGGLELINK_TOKEN
 }
 
@@ -49,6 +50,14 @@ teardown() {
     export KAGGLELINK_KEYS_URL="https://example.com/keys"
     export KAGGLELINK_TOKEN="test-token"
     
+    run bash "${PROJECT_ROOT}/setup.sh"
+    [ "$status" -eq 0 ]
+}
+
+@test "P0: should use KAGGLELINK_PASSWORD when keys URL not provided" {
+    export KAGGLELINK_PASSWORD="test-password"
+    export KAGGLELINK_TOKEN="test-token"
+
     run bash "${PROJECT_ROOT}/setup.sh"
     [ "$status" -eq 0 ]
 }
@@ -69,6 +78,15 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
+@test "P0: should use password auth when only password env var is set" {
+    export KAGGLELINK_PASSWORD="test-password"
+    export KAGGLELINK_TOKEN="test-token"
+
+    run bash "${PROJECT_ROOT}/setup.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Using SSH password from: KAGGLELINK_PASSWORD env var"* ]]
+}
+
 @test "P0: CLI args should override environment variables (keys URL)" {
     export KAGGLELINK_KEYS_URL="https://env.com/keys"
     export KAGGLELINK_TOKEN="env-token"
@@ -81,9 +99,9 @@ teardown() {
 }
 
 @test "P0: should fail when both CLI and env are missing (keys URL)" {
-    run env -u KAGGLELINK_KEYS_URL KAGGLELINK_TOKEN="test-token" PATH="$TEST_TEMP_DIR:$PATH" bash "${PROJECT_ROOT}/setup.sh"
+    run env -u KAGGLELINK_KEYS_URL -u KAGGLELINK_PASSWORD KAGGLELINK_TOKEN="test-token" PATH="$TEST_TEMP_DIR:$PATH" bash "${PROJECT_ROOT}/setup.sh"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"key"* ]] || [[ "$output" == *"URL"* ]]
+    [[ "$output" == *"SSH authentication is required"* ]]
 }
 
 @test "P0: should fail when both CLI and env are missing (token)" {
@@ -93,7 +111,7 @@ teardown() {
 }
 
 @test "P1: error message should be clear when keys URL is missing" {
-    run env -u KAGGLELINK_KEYS_URL KAGGLELINK_TOKEN="test-token" PATH="$TEST_TEMP_DIR:$PATH" bash "${PROJECT_ROOT}/setup.sh"
+    run env -u KAGGLELINK_KEYS_URL -u KAGGLELINK_PASSWORD KAGGLELINK_TOKEN="test-token" PATH="$TEST_TEMP_DIR:$PATH" bash "${PROJECT_ROOT}/setup.sh"
     [ "$status" -ne 0 ]
     # Check for actionable error message
     [[ "$output" == *"Error"* ]] || [[ "$output" == *"required"* ]]
@@ -131,6 +149,15 @@ teardown() {
     [[ "$output" == *"Using keys URL from: KAGGLELINK_KEYS_URL env var"* ]]
 }
 
+@test "P0: should log env var source when KAGGLELINK_PASSWORD used" {
+    export KAGGLELINK_PASSWORD="test-password"
+    export KAGGLELINK_TOKEN="test-token"
+
+    run bash "${PROJECT_ROOT}/setup.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Using SSH password from: KAGGLELINK_PASSWORD env var"* ]]
+}
+
 @test "P0: should log env var source when KAGGLELINK_TOKEN used" {
     export KAGGLELINK_KEYS_URL="https://example.com/keys"
     export KAGGLELINK_TOKEN="test-token"
@@ -155,10 +182,11 @@ teardown() {
 # =============================================================================
 
 @test "P0: error message mentions both -k flag AND KAGGLELINK_KEYS_URL env var" {
-    run env -u KAGGLELINK_KEYS_URL KAGGLELINK_TOKEN="test-token" PATH="$TEST_TEMP_DIR:$PATH" bash "${PROJECT_ROOT}/setup.sh"
+    run env -u KAGGLELINK_KEYS_URL -u KAGGLELINK_PASSWORD KAGGLELINK_TOKEN="test-token" PATH="$TEST_TEMP_DIR:$PATH" bash "${PROJECT_ROOT}/setup.sh"
     [ "$status" -ne 0 ]
     [[ "$output" == *"-k"* ]] || [[ "$output" == *"--keys-url"* ]]
     [[ "$output" == *"KAGGLELINK_KEYS_URL"* ]]
+    [[ "$output" == *"KAGGLELINK_PASSWORD"* ]]
 }
 
 @test "P0: error message mentions both -t flag AND KAGGLELINK_TOKEN env var" {
@@ -172,5 +200,6 @@ teardown() {
     run bash "${PROJECT_ROOT}/setup.sh" -h
     [ "$status" -eq 0 ]
     [[ "$output" == *"KAGGLELINK_KEYS_URL"* ]]
+    [[ "$output" == *"KAGGLELINK_PASSWORD"* ]]
     [[ "$output" == *"KAGGLELINK_TOKEN"* ]]
 }

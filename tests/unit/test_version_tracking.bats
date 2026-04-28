@@ -24,6 +24,9 @@ if [[ "$*" == *"clone -b nonexistent"* ]]; then
 fi
 # Create the target directory to simulate successful clone
 mkdir -p "$4" 2>/dev/null || true
+printf '#!/bin/bash\nexit 0\n' > "$4/setup_kaggle_zrok.sh"
+printf '#!/bin/bash\nexit 0\n' > "$4/start_zrok.sh"
+chmod +x "$4/setup_kaggle_zrok.sh" "$4/start_zrok.sh"
 exit 0
 EOF
   chmod +x "$TEST_TEMP_DIR/git"
@@ -149,9 +152,14 @@ WRAPPER
 }
 
 @test "setup.sh requires -k and -t arguments" {
-  run env -u KAGGLELINK_KEYS_URL -u KAGGLELINK_TOKEN bash setup.sh
+  run env -u KAGGLELINK_KEYS_URL -u KAGGLELINK_PASSWORD -u KAGGLELINK_TOKEN bash setup.sh
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Error" ]] || [[ "$output" =~ "required" ]]
+}
+
+@test "setup.sh accepts password auth with -p and -t arguments" {
+  run bash setup.sh -p "test-password" -t "test-token"
+  [ "$status" -eq 0 ]
 }
 
 @test "setup.sh shows help with -h flag" {

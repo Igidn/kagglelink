@@ -17,7 +17,7 @@ KaggleLink establishes a secure SSH tunnel to your Kaggle notebook, giving you f
 To use KaggleLink, you need:
 
 1.  **Zrok Token**: A Zrok token is essential for establishing the secure tunnel. Create an account at [myZrok.io](https://myzrok.io/) to obtain your token. Ensure your account is on the **Starter plan** to utilize NetFoundry's public Zrok instance, which offers 2 environment connections (one for your local machine, one for the Kaggle instance).
-2.  **Public SSH Key**: Your public SSH key needs to be accessible via a URL, either from a GitHub repository or another public file hosting service.
+2.  **SSH Authentication**: Use either a public SSH key hosted at a URL, or choose a password for root SSH login.
 
 ### Quick Setup (on Kaggle)
 
@@ -31,6 +31,14 @@ KaggleLink uses a project-managed pinned Zrok version (`v1.1.11`) during setup f
 
 > [!NOTE]
 > Replace `<public_key_url>` with the URL of your public SSH key file and `<zrok_token>` with your Zrok token.
+
+If you want to log in with a password instead of an SSH key, use:
+
+```bash
+!curl -sS https://bhdai.github.io/setup | bash -s -- -p <ssh_password> -t <zrok_token>
+```
+
+You can also provide both `-k` and `-p` if you want key-based and password-based SSH enabled together.
 
 Wait for the setup to complete. You should see output similar to this upon successful configuration:
 
@@ -68,6 +76,7 @@ For automated pipelines or power users, you can configure KaggleLink using envir
 | Variable | CLI Equivalent | Description |
 |----------|----------------|-------------|
 | `KAGGLELINK_KEYS_URL` | `-k` | URL to your public SSH key |
+| `KAGGLELINK_PASSWORD` | `-p` | SSH password for the root user |
 | `KAGGLELINK_TOKEN` | `-t` | Your Zrok token |
 
 > [!NOTE]
@@ -87,10 +96,13 @@ import os
 user_secrets = UserSecretsClient()
 
 # Set environment variables from secrets
-# Ensure you have added 'KAGGLELINK_TOKEN' and 'KAGGLELINK_KEYS_URL' (optional) to your secrets
+# Ensure you have added 'KAGGLELINK_TOKEN' and optionally 'KAGGLELINK_KEYS_URL' or 'KAGGLELINK_PASSWORD' to your secrets
 os.environ['KAGGLELINK_TOKEN'] = user_secrets.get_secret("KAGGLELINK_TOKEN")
 
-# You can also set the URL directly if it's public and not stored as a secret
+# You can set either password or key-based auth
+os.environ['KAGGLELINK_PASSWORD'] = user_secrets.get_secret("KAGGLELINK_PASSWORD")
+
+# Or set the URL directly if it's public and not stored as a secret
 os.environ['KAGGLELINK_KEYS_URL'] = "https://raw.githubusercontent.com/your/repo/main/key.pub"
 ```
 
@@ -133,6 +145,12 @@ Connect to your Kaggle instance via SSH using the local address and port provide
 
 ```bash
 ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ~/.ssh/kaggle_rsa -p 9191 root@127.0.0.1
+```
+
+If you used password auth instead, omit `-i` and enter the password you configured during setup:
+
+```bash
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -p 9191 root@127.0.0.1
 ```
 
 > [!NOTE]

@@ -7,14 +7,42 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=logging_utils.sh
 source "$SCRIPT_DIR/logging_utils.sh"
 
-if [ "$#" -ne 1 ]; then
-    echo "Usage: ./setup_kaggle_zrok.sh <authorized_keys_url>"
+AUTH_KEYS_URL=""
+SSH_PASSWORD=""
+
+usage() {
+    echo "Usage: ./setup_kaggle_zrok.sh [--keys-url <authorized_keys_url>] [--password <ssh_password>]"
     exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -k | --keys-url)
+            AUTH_KEYS_URL="$2"
+            shift 2
+            ;;
+        -p | --password)
+            SSH_PASSWORD="$2"
+            shift 2
+            ;;
+        -h | --help)
+            usage
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+
+if [ -z "$AUTH_KEYS_URL" ] && [ -z "$SSH_PASSWORD" ]; then
+    usage
 fi
 
-AUTH_KEYS_URL=$1
-
 setup_ssh_directory() {
+    if [ -z "$AUTH_KEYS_URL" ]; then
+        return 0
+    fi
+
     log_info "Setting up SSH directory in user's home..."
     # If running as root, $HOME/.ssh becomes /root/.ssh
     local ssh_dir_path="$HOME/.ssh"
@@ -25,6 +53,20 @@ setup_ssh_directory() {
         log_success "SSH directory and authorized_keys set up in $ssh_dir_path"
     else
         categorize_error "network" "Failed to download authorized keys from $AUTH_KEYS_URL" "Check URL is accessible and internet connectivity"
+        exit 1
+    fi
+}
+
+configure_root_password() {
+    if [ -z "$SSH_PASSWORD" ]; then
+        return 0
+    fi
+
+    log_info "Setting SSH password for root user..."
+    if printf 'root:%s\n' "$SSH_PASSWORD" | chpasswd; then
+        log_success "Root SSH password configured"
+    else
+        categorize_error "upstream" "Failed to set SSH password for root user" "Check that chpasswd is available and rerun setup"
         exit 1
     fi
 }
@@ -298,6 +340,7 @@ copy_screenrc() {
     install_packages
     install_zrok
     setup_ssh_directory # run sequentially
+    configure_root_password # run sequentially
     configure_sshd      # run sequentially
     copy_vscode_dir &
     copy_screenrc &

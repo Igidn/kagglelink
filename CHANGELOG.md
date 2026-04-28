@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.0] - 2025-01-09
 
 ### Added
+- **Password-based SSH login** - `setup.sh` now supports `-p/--password` and `KAGGLELINK_PASSWORD` as an alternative to hosted public keys
 - **Environment variable fallback support** - Configure via `KAGGLELINK_KEYS_URL` and `KAGGLELINK_TOKEN` env vars as alternative to CLI flags (#14)
 - **Unified logging system** - Consistent logging with emoji indicators (⏳ ✅ ❌), timestamps, elapsed time tracking, and error categorization (#15)
 - **Success banner with zrok token** - Clear connection instructions displayed after setup with the zrok share token
